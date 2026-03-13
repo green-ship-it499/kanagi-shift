@@ -1,0 +1,867 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>麺処神凪 シフト管理 4月</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@300;400;500;700&family=Zen+Kaku+Gothic+New:wght@400;700;900&display=swap');
+
+  :root {
+    --primary: #1a3a5c;
+    --accent: #c8a96e;
+    --accent2: #e8c987;
+    --bg: #f5f2ee;
+    --bg2: #eae6e0;
+    --white: #ffffff;
+    --red: #c0392b;
+    --green: #27ae60;
+    --text: #2c2c2c;
+    --muted: #888;
+    --border: #d4cfc8;
+    --lunch: #3498db;
+    --dinner: #e67e22;
+    --off: #e8e4de;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    font-family: 'Noto Sans JP', sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    min-height: 100vh;
+  }
+
+  header {
+    background: var(--primary);
+    color: var(--white);
+    padding: 18px 32px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    box-shadow: 0 2px 12px rgba(0,0,0,0.18);
+  }
+
+  header h1 {
+    font-family: 'Zen Kaku Gothic New', sans-serif;
+    font-size: 1.4rem;
+    font-weight: 900;
+    letter-spacing: 0.08em;
+  }
+
+  header .sub {
+    font-size: 0.8rem;
+    color: var(--accent2);
+    margin-top: 2px;
+  }
+
+  .budget-bar {
+    background: var(--primary);
+    border-top: 1px solid rgba(255,255,255,0.1);
+    padding: 10px 32px;
+    display: flex;
+    gap: 32px;
+    align-items: center;
+    font-size: 0.85rem;
+    color: var(--accent2);
+  }
+
+  .budget-bar .val { color: white; font-weight: 700; font-size: 1rem; }
+  .budget-bar .over { color: #e74c3c; }
+  .budget-bar .ok { color: #2ecc71; }
+
+  .tabs {
+    display: flex;
+    background: var(--bg2);
+    border-bottom: 2px solid var(--border);
+    padding: 0 24px;
+  }
+
+  .tab {
+    padding: 12px 24px;
+    cursor: pointer;
+    font-size: 0.9rem;
+    font-weight: 500;
+    color: var(--muted);
+    border-bottom: 3px solid transparent;
+    transition: all 0.2s;
+    margin-bottom: -2px;
+  }
+
+  .tab.active {
+    color: var(--primary);
+    border-bottom-color: var(--accent);
+    font-weight: 700;
+  }
+
+  .panel { display: none; padding: 24px 32px; }
+  .panel.active { display: block; }
+
+  /* ===== STEP 1: 希望休 ===== */
+  .staff-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+    gap: 16px;
+    margin-top: 16px;
+  }
+
+  .staff-card {
+    background: var(--white);
+    border-radius: 10px;
+    padding: 16px;
+    border: 1px solid var(--border);
+    box-shadow: 0 1px 4px rgba(0,0,0,0.06);
+  }
+
+  .staff-card .name {
+    font-weight: 700;
+    font-size: 1rem;
+    color: var(--primary);
+    margin-bottom: 4px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+
+  .staff-card .role-tag {
+    font-size: 0.7rem;
+    background: var(--bg2);
+    color: var(--muted);
+    padding: 2px 8px;
+    border-radius: 20px;
+    font-weight: 400;
+  }
+
+  .staff-card .wage {
+    font-size: 0.78rem;
+    color: var(--muted);
+    margin-bottom: 10px;
+  }
+
+  .calendar-mini {
+    display: grid;
+    grid-template-columns: repeat(7, 1fr);
+    gap: 3px;
+  }
+
+  .cal-header {
+    text-align: center;
+    font-size: 0.65rem;
+    color: var(--muted);
+    padding: 2px 0;
+    font-weight: 700;
+  }
+  .cal-header.sun { color: #e74c3c; }
+  .cal-header.sat { color: #3498db; }
+
+  .cal-day {
+    text-align: center;
+    font-size: 0.72rem;
+    padding: 4px 2px;
+    border-radius: 4px;
+    cursor: pointer;
+    border: 1px solid transparent;
+    transition: all 0.15s;
+    user-select: none;
+    background: var(--bg2);
+  }
+
+  .cal-day:hover { border-color: var(--accent); }
+  .cal-day.off-wish { background: #fde8e8; color: #c0392b; font-weight: 700; border-color: #e74c3c; }
+  .cal-day.closed { background: var(--off); color: #bbb; cursor: default; }
+  .cal-day.empty { background: transparent; border-color: transparent; cursor: default; }
+  .cal-day.sunday { color: #e74c3c; }
+  .cal-day.saturday { color: #3498db; }
+
+  /* ===== STEP 2: シフト表 ===== */
+  .shift-controls {
+    display: flex;
+    gap: 12px;
+    margin-bottom: 20px;
+    flex-wrap: wrap;
+    align-items: center;
+  }
+
+  .btn {
+    padding: 10px 20px;
+    border: none;
+    border-radius: 6px;
+    cursor: pointer;
+    font-family: inherit;
+    font-size: 0.88rem;
+    font-weight: 700;
+    transition: all 0.2s;
+  }
+
+  .btn-primary {
+    background: var(--primary);
+    color: white;
+  }
+  .btn-primary:hover { background: #243f63; transform: translateY(-1px); }
+
+  .btn-accent {
+    background: var(--accent);
+    color: var(--primary);
+  }
+  .btn-accent:hover { background: var(--accent2); transform: translateY(-1px); }
+
+  .btn-outline {
+    background: white;
+    color: var(--primary);
+    border: 2px solid var(--primary);
+  }
+  .btn-outline:hover { background: var(--bg2); }
+
+  .shift-table-wrap {
+    overflow-x: auto;
+    border-radius: 10px;
+    box-shadow: 0 2px 12px rgba(0,0,0,0.08);
+  }
+
+  table.shift-table {
+    border-collapse: collapse;
+    min-width: 900px;
+    width: 100%;
+    background: white;
+    font-size: 0.78rem;
+  }
+
+  .shift-table th {
+    background: var(--primary);
+    color: white;
+    padding: 8px 6px;
+    text-align: center;
+    font-weight: 700;
+    white-space: nowrap;
+    position: sticky;
+    top: 0;
+  }
+
+  .shift-table th.sun { background: #7f2020; }
+  .shift-table th.sat { background: #1a4a7a; }
+
+  .shift-table td {
+    border: 1px solid var(--border);
+    padding: 4px 3px;
+    text-align: center;
+    vertical-align: middle;
+    min-width: 52px;
+  }
+
+  .shift-table .staff-name {
+    font-weight: 700;
+    text-align: left;
+    padding-left: 10px;
+    white-space: nowrap;
+    background: var(--bg2);
+    min-width: 80px;
+  }
+
+  .shift-cell {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+  }
+
+  .shift-badge {
+    padding: 2px 4px;
+    border-radius: 3px;
+    font-size: 0.7rem;
+    font-weight: 700;
+    cursor: pointer;
+    transition: opacity 0.15s;
+  }
+
+  .shift-badge:hover { opacity: 0.7; }
+  .shift-badge.lunch { background: #d6eaf8; color: #1a6da0; }
+  .shift-badge.dinner { background: #fdebd0; color: #a04a0a; }
+  .shift-badge.off { background: var(--off); color: var(--muted); }
+  .shift-badge.wish-off { background: #fde8e8; color: #c0392b; }
+  .shift-badge.closed { background: #f0f0f0; color: #ccc; }
+
+  .day-total {
+    font-size: 0.7rem;
+    background: var(--bg2);
+    font-weight: 700;
+  }
+
+  /* Summary */
+  .summary-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+    gap: 12px;
+    margin-top: 16px;
+  }
+
+  .summary-card {
+    background: white;
+    border-radius: 8px;
+    padding: 14px 16px;
+    border: 1px solid var(--border);
+  }
+
+  .summary-card .sname { font-size: 0.8rem; color: var(--muted); }
+  .summary-card .shours { font-size: 1.4rem; font-weight: 700; color: var(--primary); }
+  .summary-card .spay { font-size: 0.85rem; color: var(--accent); font-weight: 600; }
+
+  .section-title {
+    font-family: 'Zen Kaku Gothic New', sans-serif;
+    font-size: 1.1rem;
+    font-weight: 700;
+    color: var(--primary);
+    margin-bottom: 12px;
+    padding-bottom: 8px;
+    border-bottom: 2px solid var(--accent);
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+
+  .legend {
+    display: flex;
+    gap: 16px;
+    margin-bottom: 14px;
+    flex-wrap: wrap;
+  }
+
+  .legend-item {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 0.78rem;
+  }
+
+  .legend-dot {
+    width: 16px;
+    height: 16px;
+    border-radius: 3px;
+  }
+
+  .info-box {
+    background: #eaf4fb;
+    border-left: 4px solid var(--lunch);
+    padding: 10px 14px;
+    border-radius: 0 6px 6px 0;
+    font-size: 0.82rem;
+    margin-bottom: 16px;
+    color: #1a4a6a;
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <div>
+    <h1>🍜 麺処神凪 シフト管理</h1>
+    <div class="sub">2025年4月 ／ 月曜定休</div>
+  </div>
+  <div style="text-align:right; font-size:0.82rem; color:var(--accent2);">
+    予算上限：<strong style="color:white; font-size:1.1rem;">¥750,000</strong>（京太さん含む）
+  </div>
+</header>
+
+<div class="budget-bar" id="budgetBar">
+  <span>人件費合計（アルバイト）: <span class="val" id="totalPay">¥0</span></span>
+  <span>京太さん: <span class="val">¥175,000</span></span>
+  <span>合計: <span class="val" id="grandTotal">¥175,000</span></span>
+  <span>予算残: <span class="val ok" id="budgetRemain">¥575,000</span></span>
+  <span>総シフト時間: <span class="val" id="totalHours">0</span>h</span>
+</div>
+
+<div class="tabs">
+  <div class="tab active" onclick="showTab('wish')">① 希望休の入力</div>
+  <div class="tab" onclick="showTab('shift')">② シフト表</div>
+  <div class="tab" onclick="showTab('summary')">③ 集計</div>
+</div>
+
+<!-- TAB 1: 希望休 -->
+<div class="panel active" id="panel-wish">
+  <div class="section-title">📅 希望休を入力してください</div>
+  <div class="info-box">日付をクリックすると希望休（赤）になります。もう一度クリックで解除。<br>🔒 月曜は定休日。🚫 対象外の曜日は制限あり。</div>
+  <div class="staff-grid" id="staffGrid"></div>
+  <div style="margin-top:20px;">
+    <button class="btn btn-primary" onclick="generateShift()">✨ シフトを自動生成する</button>
+  </div>
+</div>
+
+<!-- TAB 2: シフト表 -->
+<div class="panel" id="panel-shift">
+  <div class="shift-controls">
+    <button class="btn btn-accent" onclick="generateShift()">🔄 再生成</button>
+    <button class="btn btn-outline" onclick="exportExcel()">📥 Excelダウンロード</button>
+  </div>
+  <div class="legend">
+    <div class="legend-item"><div class="legend-dot" style="background:#d6eaf8;"></div>ランチ</div>
+    <div class="legend-item"><div class="legend-dot" style="background:#fdebd0;"></div>ディナー</div>
+    <div class="legend-item"><div class="legend-dot" style="background:#fde8e8;"></div>希望休</div>
+    <div class="legend-item"><div class="legend-dot" style="background:#f0f0f0;"></div>定休日</div>
+    <div class="legend-item"><div class="legend-dot" style="background:#eae6e0;"></div>休み</div>
+  </div>
+  <div class="shift-table-wrap">
+    <table class="shift-table" id="shiftTable"></table>
+  </div>
+</div>
+
+<!-- TAB 3: 集計 -->
+<div class="panel" id="panel-summary">
+  <div class="section-title">💴 スタッフ別集計</div>
+  <div class="summary-grid" id="summaryGrid"></div>
+</div>
+
+<script>
+// ===== DATA =====
+const BUDGET = 750000;
+const KYOTA_SALARY = 175000;
+const TRANSPORT = 120;
+
+const APRIL_2025 = {
+  year: 2025, month: 4,
+  startDow: 2, // April 1 = Tuesday (0=Sun)
+  days: 30
+};
+
+// Staff config
+const STAFF = [
+  { id: 'ishiyama', name: '石山', wage: 1250, lunch: true, dinner: false, weekendOnly: false, weekdayOnly: true, note: '平日のみ' },
+  { id: 'itasaka', name: '板坂', wage: 1150, lunch: true, dinner: true, weekendOnly: false, weekdayOnly: false, note: '' },
+  { id: 'tamaki', name: '玉木', wage: 1150, lunch: true, dinner: true, weekendOnly: false, weekdayOnly: false, note: '' },
+  { id: 'narumi', name: 'なるみ', wage: 1150, lunch: true, dinner: true, weekendOnly: true, weekdayOnly: false, note: '土日優先' },
+  { id: 'ayana', name: 'アヤナ', wage: 1150, lunch: true, dinner: true, weekendOnly: true, weekdayOnly: false, note: '土日どちらか' },
+  { id: 'yanagawa', name: '柳川', wage: 1150, lunch: true, dinner: true, weekendOnly: false, weekdayOnly: false, note: '' },
+  { id: 'kamino', name: '神野', wage: 1150, lunch: false, dinner: true, weekendOnly: false, weekdayOnly: false, note: '夜のみ' },
+  { id: 'sasaki', name: '佐々木', wage: 1150, lunch: true, dinner: false, weekendOnly: false, weekdayOnly: true, note: 'たまに平日昼のみ' },
+  { id: 'hina', name: 'ひな', wage: 1150, lunch: false, dinner: true, weekendOnly: false, weekdayOnly: false, note: '夜のみ' },
+  { id: 'manami', name: 'まなみ', wage: 1150, lunch: true, dinner: true, weekendOnly: false, weekdayOnly: false, note: '' },
+];
+
+const DOW_NAMES = ['日','月','火','水','木','金','土'];
+const DOW_CLASSES = ['sunday','','','','','','saturday'];
+const HEADER_CLASSES = ['sun','','','','','','sat'];
+
+// State
+let wishOff = {}; // { staffId: Set of day numbers }
+let shiftData = {}; // { staffId: { day: 'lunch'|'dinner'|'both'|'off'|'closed' } }
+
+STAFF.forEach(s => { wishOff[s.id] = new Set(); });
+
+// ===== HELPERS =====
+function getDow(day) {
+  return (APRIL_2025.startDow + day - 1) % 7;
+}
+function isMonday(day) { return getDow(day) === 1; }
+function isWeekend(day) { const d = getDow(day); return d === 0 || d === 6; }
+function isSunday(day) { return getDow(day) === 0; }
+function isSaturday(day) { return getDow(day) === 6; }
+
+function fmt(n) { return '¥' + n.toLocaleString(); }
+
+// ===== TAB =====
+function showTab(id) {
+  document.querySelectorAll('.tab').forEach((t,i) => {
+    t.classList.toggle('active', ['wish','shift','summary'][i] === id);
+  });
+  document.querySelectorAll('.panel').forEach(p => p.classList.remove('active'));
+  document.getElementById('panel-' + id).classList.add('active');
+  if (id === 'summary') renderSummary();
+}
+
+// ===== WISH OFF CALENDAR =====
+function buildWishCalendars() {
+  const grid = document.getElementById('staffGrid');
+  grid.innerHTML = '';
+
+  STAFF.forEach(s => {
+    const card = document.createElement('div');
+    card.className = 'staff-card';
+
+    let noteHtml = s.note ? `<span class="role-tag">${s.note}</span>` : '';
+    card.innerHTML = `
+      <div class="name">${s.name} ${noteHtml}</div>
+      <div class="wage">時給 ¥${s.wage.toLocaleString()} ／ 交通費 ¥${TRANSPORT}/回</div>
+      <div class="calendar-mini" id="cal-${s.id}"></div>
+    `;
+    grid.appendChild(card);
+
+    const cal = card.querySelector(`#cal-${s.id}`);
+    DOW_NAMES.forEach((d,i) => {
+      const h = document.createElement('div');
+      h.className = `cal-header ${HEADER_CLASSES[i]}`;
+      h.textContent = d;
+      cal.appendChild(h);
+    });
+
+    // Empty cells before day 1
+    for (let i = 0; i < APRIL_2025.startDow; i++) {
+      const e = document.createElement('div');
+      e.className = 'cal-day empty';
+      cal.appendChild(e);
+    }
+
+    for (let day = 1; day <= APRIL_2025.days; day++) {
+      const dow = getDow(day);
+      const el = document.createElement('div');
+      el.className = 'cal-day';
+      el.textContent = day;
+
+      if (isMonday(day)) {
+        el.classList.add('closed');
+        el.title = '定休日';
+      } else {
+        if (dow === 0) el.classList.add('sunday');
+        if (dow === 6) el.classList.add('saturday');
+
+        // Disable if constraint
+        const weekend = isWeekend(day);
+        const canWork = s.weekdayOnly ? !weekend : true;
+        // weekendOnly staff - they CAN work weekdays too but prefer weekend
+        
+        if (!canWork) {
+          el.classList.add('closed');
+          el.title = '対象外';
+        } else {
+          if (wishOff[s.id].has(day)) el.classList.add('off-wish');
+          el.onclick = () => toggleWish(s.id, day, el);
+        }
+      }
+      cal.appendChild(el);
+    }
+  });
+}
+
+function toggleWish(staffId, day, el) {
+  if (wishOff[staffId].has(day)) {
+    wishOff[staffId].delete(day);
+    el.classList.remove('off-wish');
+  } else {
+    wishOff[staffId].add(day);
+    el.classList.add('off-wish');
+  }
+}
+
+// ===== SHIFT GENERATION =====
+function generateShift() {
+  shiftData = {};
+  STAFF.forEach(s => { shiftData[s.id] = {}; });
+
+  // For each working day, assign shifts
+  for (let day = 1; day <= APRIL_2025.days; day++) {
+    if (isMonday(day)) {
+      STAFF.forEach(s => { shiftData[s.id][day] = 'closed'; });
+      continue;
+    }
+
+    const weekend = isWeekend(day);
+    const lunchNeeded = weekend ? 3 : 2;
+    const dinnerNeeded = weekend ? 3 : 2;
+
+    // Available staff for lunch
+    let lunchPool = STAFF.filter(s => {
+      if (!s.lunch) return false;
+      if (wishOff[s.id].has(day)) return false;
+      if (s.weekdayOnly && weekend) return false;
+      if (s.id === 'sasaki') return !weekend && Math.random() < 0.4; // occasional
+      return true;
+    });
+
+    // Weekend priority for narumi & ayana
+    if (weekend) {
+      lunchPool.sort((a,b) => {
+        const ap = (a.id === 'narumi' || a.id === 'ayana') ? -1 : 0;
+        const bp = (b.id === 'narumi' || b.id === 'ayana') ? -1 : 0;
+        return ap - bp + (Math.random()-0.5)*0.1;
+      });
+    } else {
+      lunchPool.sort(() => Math.random() - 0.5);
+    }
+
+    const lunchAssigned = new Set();
+    lunchPool.slice(0, lunchNeeded).forEach(s => lunchAssigned.add(s.id));
+
+    // Available staff for dinner
+    let dinnerPool = STAFF.filter(s => {
+      if (!s.dinner) return false;
+      if (wishOff[s.id].has(day)) return false;
+      if (s.weekdayOnly && weekend) return false;
+      if (s.id === 'sasaki') return false; // lunch only
+      return true;
+    });
+
+    if (weekend) {
+      dinnerPool.sort((a,b) => {
+        const ap = (a.id === 'narumi' || a.id === 'ayana') ? -1 : 0;
+        const bp = (b.id === 'narumi' || b.id === 'ayana') ? -1 : 0;
+        return ap - bp + (Math.random()-0.5)*0.1;
+      });
+    } else {
+      dinnerPool.sort(() => Math.random() - 0.5);
+    }
+
+    const dinnerAssigned = new Set();
+    dinnerPool.slice(0, dinnerNeeded).forEach(s => dinnerAssigned.add(s.id));
+
+    // Assign to shiftData
+    STAFF.forEach(s => {
+      const inL = lunchAssigned.has(s.id);
+      const inD = dinnerAssigned.has(s.id);
+      if (wishOff[s.id].has(day)) {
+        shiftData[s.id][day] = 'wish-off';
+      } else if (inL && inD) {
+        shiftData[s.id][day] = 'both';
+      } else if (inL) {
+        shiftData[s.id][day] = 'lunch';
+      } else if (inD) {
+        shiftData[s.id][day] = 'dinner';
+      } else {
+        shiftData[s.id][day] = 'off';
+      }
+    });
+  }
+
+  renderShiftTable();
+  updateBudget();
+  showTab('shift');
+}
+
+// ===== RENDER SHIFT TABLE =====
+function renderShiftTable() {
+  const tbl = document.getElementById('shiftTable');
+  tbl.innerHTML = '';
+
+  // Header row
+  const thead = document.createElement('thead');
+  const tr0 = document.createElement('tr');
+  const thName = document.createElement('th');
+  thName.textContent = 'スタッフ';
+  thName.style.minWidth = '80px';
+  tr0.appendChild(thName);
+
+  for (let day = 1; day <= APRIL_2025.days; day++) {
+    const dow = getDow(day);
+    const th = document.createElement('th');
+    th.innerHTML = `<div>${day}</div><div style="font-size:0.65rem;opacity:0.8">${DOW_NAMES[dow]}</div>`;
+    if (isMonday(day)) { th.style.background = '#555'; }
+    else if (isSunday(day)) { th.classList.add('sun'); }
+    else if (isSaturday(day)) { th.classList.add('sat'); }
+    tr0.appendChild(th);
+  }
+
+  // Hours column
+  const thH = document.createElement('th');
+  thH.textContent = '合計';
+  tr0.appendChild(thH);
+  thead.appendChild(tr0);
+  tbl.appendChild(thead);
+
+  const tbody = document.createElement('tbody');
+
+  STAFF.forEach(s => {
+    const tr = document.createElement('tr');
+    const tdName = document.createElement('td');
+    tdName.className = 'staff-name';
+    tdName.innerHTML = `${s.name}<br><span style="font-size:0.65rem;color:#999;font-weight:400">¥${s.wage}</span>`;
+    tr.appendChild(tdName);
+
+    let totalShifts = 0;
+
+    for (let day = 1; day <= APRIL_2025.days; day++) {
+      const td = document.createElement('td');
+      const status = shiftData[s.id] ? shiftData[s.id][day] : 'off';
+
+      if (status === 'closed') {
+        td.innerHTML = '<span class="shift-badge closed">休</span>';
+      } else if (status === 'wish-off') {
+        td.innerHTML = '<span class="shift-badge wish-off">希望休</span>';
+      } else if (status === 'both') {
+        td.innerHTML = '<div class="shift-cell"><span class="shift-badge lunch">昼</span><span class="shift-badge dinner">夜</span></div>';
+        totalShifts += 2;
+      } else if (status === 'lunch') {
+        td.innerHTML = '<span class="shift-badge lunch">昼</span>';
+        totalShifts += 1;
+      } else if (status === 'dinner') {
+        td.innerHTML = '<span class="shift-badge dinner">夜</span>';
+        totalShifts += 1;
+      } else {
+        td.innerHTML = '<span class="shift-badge off">－</span>';
+      }
+
+      tr.appendChild(td);
+    }
+
+    // Total shifts
+    const avgH = 4;
+    const totalH = totalShifts * avgH;
+    const tdTotal = document.createElement('td');
+    tdTotal.style.fontWeight = '700';
+    tdTotal.style.background = '#f5f2ee';
+    tdTotal.innerHTML = `${totalShifts}回<br><span style="font-size:0.7rem;color:#888">${totalH}h</span>`;
+    tr.appendChild(tdTotal);
+
+    tbody.appendChild(tr);
+  });
+
+  tbl.appendChild(tbody);
+}
+
+// ===== BUDGET =====
+function calcStaffPay(s) {
+  if (!shiftData[s.id]) return { shifts: 0, hours: 0, transport: 0, total: 0 };
+  let shifts = 0;
+  let workDays = new Set();
+  for (let day = 1; day <= APRIL_2025.days; day++) {
+    const st = shiftData[s.id][day];
+    if (st === 'both') { shifts += 2; workDays.add(day); }
+    else if (st === 'lunch' || st === 'dinner') { shifts += 1; workDays.add(day); }
+  }
+  const hours = shifts * 4;
+  const transport = workDays.size * TRANSPORT;
+  const pay = hours * s.wage + transport;
+  return { shifts, hours, transport, total: pay };
+}
+
+function updateBudget() {
+  let totalPart = 0;
+  STAFF.forEach(s => { totalPart += calcStaffPay(s).total; });
+  const grand = totalPart + KYOTA_SALARY;
+  const remain = BUDGET - grand;
+  const totalH = STAFF.reduce((a,s) => a + calcStaffPay(s).hours, 0);
+
+  document.getElementById('totalPay').textContent = fmt(totalPart);
+  document.getElementById('grandTotal').textContent = fmt(grand);
+  document.getElementById('totalHours').textContent = totalH;
+
+  const remEl = document.getElementById('budgetRemain');
+  remEl.textContent = fmt(remain);
+  remEl.className = 'val ' + (remain >= 0 ? 'ok' : 'over');
+}
+
+// ===== SUMMARY =====
+function renderSummary() {
+  const grid = document.getElementById('summaryGrid');
+  grid.innerHTML = '';
+
+  // Kyota card
+  const kyotaCard = document.createElement('div');
+  kyotaCard.className = 'summary-card';
+  kyotaCard.innerHTML = `
+    <div class="sname">京太（固定給）</div>
+    <div class="shours">固定</div>
+    <div class="spay">${fmt(KYOTA_SALARY)}</div>
+  `;
+  grid.appendChild(kyotaCard);
+
+  let totalPart = 0;
+  STAFF.forEach(s => {
+    const { shifts, hours, transport, total } = calcStaffPay(s);
+    totalPart += total;
+    const card = document.createElement('div');
+    card.className = 'summary-card';
+    card.innerHTML = `
+      <div class="sname">${s.name} <span style="font-size:0.7rem;color:#bbb">¥${s.wage}/h</span></div>
+      <div class="shours">${shifts}回 / ${hours}h</div>
+      <div class="spay">${fmt(total)} <span style="font-size:0.72rem;color:#aaa">（交通費¥${transport.toLocaleString()}含む）</span></div>
+    `;
+    grid.appendChild(card);
+  });
+
+  // Total card
+  const grand = totalPart + KYOTA_SALARY;
+  const remain = BUDGET - grand;
+  const totalCard = document.createElement('div');
+  totalCard.className = 'summary-card';
+  totalCard.style.borderColor = remain >= 0 ? '#27ae60' : '#e74c3c';
+  totalCard.style.borderWidth = '2px';
+  totalCard.innerHTML = `
+    <div class="sname">合計</div>
+    <div class="shours" style="color:${remain >= 0 ? 'var(--green)' : 'var(--red)'}">${fmt(grand)}</div>
+    <div class="spay">予算残: ${fmt(remain)}</div>
+  `;
+  grid.appendChild(totalCard);
+}
+
+// ===== EXCEL EXPORT =====
+function exportExcel() {
+  const wb = XLSX.utils.book_new();
+
+  // Build array of arrays
+  const headers = ['スタッフ', '時給'];
+  const workingDays = [];
+  for (let day = 1; day <= APRIL_2025.days; day++) {
+    if (!isMonday(day)) {
+      headers.push(`${day}(${DOW_NAMES[getDow(day)]})`);
+      workingDays.push(day);
+    }
+  }
+  headers.push('出勤回数', '総時間', '給与', '交通費', '合計');
+
+  const rows = [headers];
+
+  STAFF.forEach(s => {
+    const row = [s.name, s.wage];
+    let shifts = 0;
+    let workDays = 0;
+    workingDays.forEach(day => {
+      const st = shiftData[s.id] ? shiftData[s.id][day] : 'off';
+      let cell = '';
+      if (st === 'wish-off') { cell = '希望休'; }
+      else if (st === 'both') { cell = '昼夜'; shifts += 2; workDays++; }
+      else if (st === 'lunch') { cell = '昼'; shifts++; workDays++; }
+      else if (st === 'dinner') { cell = '夜'; shifts++; workDays++; }
+      else { cell = ''; }
+      row.push(cell);
+    });
+    const hours = shifts * 4;
+    const pay = hours * s.wage;
+    const transport = workDays * TRANSPORT;
+    row.push(shifts, hours, pay, transport, pay + transport);
+    rows.push(row);
+  });
+
+  // Kyota row
+  const kyotaRow = ['京太（固定）', '-'];
+  workingDays.forEach(() => kyotaRow.push('固定'));
+  kyotaRow.push('-', '-', KYOTA_SALARY, '-', KYOTA_SALARY);
+  rows.push(kyotaRow);
+
+  // Total row
+  let grandPart = 0;
+  STAFF.forEach(s => { grandPart += calcStaffPay(s).total; });
+  const grand = grandPart + KYOTA_SALARY;
+  const totalRow = ['【合計】', '', ...workingDays.map(() => ''), '', '', grand, '', grand];
+  rows.push(totalRow);
+  rows.push(['予算', BUDGET, ...workingDays.map(() => ''), '', '', '', '', '']);
+  rows.push(['残', BUDGET - grand]);
+
+  const ws = XLSX.utils.aoa_to_sheet(rows);
+
+  // Column widths
+  ws['!cols'] = [{ wch: 10 }, { wch: 8 }];
+  workingDays.forEach(() => ws['!cols'].push({ wch: 7 }));
+  [8,8,10,8,10].forEach(w => ws['!cols'].push({ wch: w }));
+
+  XLSX.utils.book_append_sheet(wb, ws, '4月シフト');
+
+  // Summary sheet
+  const sumRows = [['スタッフ', '出勤回数', '総時間(h)', '給与', '交通費', '合計']];
+  STAFF.forEach(s => {
+    const { shifts, hours, transport, total } = calcStaffPay(s);
+    sumRows.push([s.name, shifts, hours, hours * s.wage, transport, total]);
+  });
+  sumRows.push(['京太', '固定', '-', KYOTA_SALARY, '-', KYOTA_SALARY]);
+  sumRows.push(['合計', '', '', '', '', grand]);
+  sumRows.push(['予算', '', '', '', '', BUDGET]);
+  sumRows.push(['差額', '', '', '', '', BUDGET - grand]);
+
+  const ws2 = XLSX.utils.aoa_to_sheet(sumRows);
+  ws2['!cols'] = [{ wch: 12 }, { wch: 10 }, { wch: 12 }, { wch: 12 }, { wch: 10 }, { wch: 12 }];
+  XLSX.utils.book_append_sheet(wb, ws2, '集計');
+
+  XLSX.writeFile(wb, '神凪_シフト_2025年4月.xlsx');
+}
+
+// ===== INIT =====
+buildWishCalendars();
+</script>
+</body>
+</html>
