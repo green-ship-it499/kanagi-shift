@@ -348,6 +348,64 @@
     margin-bottom: 16px;
     color: #1a4a6a;
   }
+
+  /* ===== MOBILE ===== */
+  @media (max-width: 640px) {
+    header {
+      padding: 12px 16px;
+      flex-direction: column;
+      align-items: flex-start;
+      gap: 6px;
+    }
+
+    header h1 { font-size: 1.1rem; }
+
+    header > div:last-child {
+      text-align: left;
+      font-size: 0.75rem;
+    }
+
+    .budget-bar {
+      padding: 8px 16px;
+      gap: 10px;
+      flex-wrap: wrap;
+      font-size: 0.78rem;
+    }
+
+    .budget-bar .val { font-size: 0.9rem; }
+
+    .tabs {
+      padding: 0 8px;
+      overflow-x: auto;
+    }
+
+    .tab {
+      padding: 10px 12px;
+      font-size: 0.8rem;
+      white-space: nowrap;
+    }
+
+    .panel { padding: 16px; }
+
+    .staff-grid {
+      grid-template-columns: 1fr;
+    }
+
+    .shift-controls {
+      gap: 8px;
+    }
+
+    .btn {
+      padding: 9px 14px;
+      font-size: 0.82rem;
+    }
+
+    .summary-grid {
+      grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+    }
+
+    .section-title { font-size: 1rem; }
+  }
 </style>
 </head>
 <body>
@@ -415,6 +473,8 @@
 const BUDGET = 750000;
 const KYOTA_SALARY = 175000;
 const TRANSPORT = 120;
+const WEEKEND_PREMIUM = 150; // 土日祝の時給アップ額
+const HOLIDAYS_APRIL = new Set([29]); // 昭和の日
 
 const APRIL_2025 = {
   year: 2025, month: 4,
@@ -428,7 +488,7 @@ const STAFF = [
   { id: 'itasaka', name: '板坂', wage: 1150, lunch: true, dinner: true, weekendOnly: false, weekdayOnly: false, note: '' },
   { id: 'tamaki', name: '玉木', wage: 1150, lunch: true, dinner: true, weekendOnly: false, weekdayOnly: false, note: '' },
   { id: 'narumi', name: 'なるみ', wage: 1150, lunch: true, dinner: true, weekendOnly: true, weekdayOnly: false, note: '土日優先' },
-  { id: 'ayana', name: 'アヤナ', wage: 1150, lunch: true, dinner: true, weekendOnly: true, weekdayOnly: false, note: '土日どちらか' },
+  { id: 'ayana', name: 'アヤナ', wage: 1100, lunch: true, dinner: true, weekendOnly: true, weekdayOnly: false, note: '土日どちらか' },
   { id: 'yanagawa', name: '柳川', wage: 1150, lunch: true, dinner: true, weekendOnly: false, weekdayOnly: false, note: '' },
   { id: 'kamino', name: '神野', wage: 1150, lunch: false, dinner: true, weekendOnly: false, weekdayOnly: false, note: '夜のみ' },
   { id: 'sasaki', name: '佐々木', wage: 1150, lunch: true, dinner: false, weekendOnly: false, weekdayOnly: true, note: 'たまに平日昼のみ' },
@@ -454,6 +514,7 @@ function isMonday(day) { return getDow(day) === 1; }
 function isWeekend(day) { const d = getDow(day); return d === 0 || d === 6; }
 function isSunday(day) { return getDow(day) === 0; }
 function isSaturday(day) { return getDow(day) === 6; }
+function isPremiumDay(day) { return isWeekend(day) || HOLIDAYS_APRIL.has(day); }
 
 function fmt(n) { return '¥' + n.toLocaleString(); }
 
@@ -477,9 +538,14 @@ function buildWishCalendars() {
     card.className = 'staff-card';
 
     let noteHtml = s.note ? `<span class="role-tag">${s.note}</span>` : '';
+    const wageHtml = s.id === 'yanagawa'
+      ? `時給 <input type="number" id="wage-yanagawa" value="${s.wage}" min="900" max="3000" step="10"
+           style="width:64px;font-size:0.82rem;padding:1px 4px;border:1px solid var(--border);border-radius:4px;font-family:inherit;"
+           onchange="updateYanagawaWage(this.value)"> 円 ／ 交通費 ¥${TRANSPORT}/回`
+      : `時給 ¥${s.wage.toLocaleString()} ／ 交通費 ¥${TRANSPORT}/回`;
     card.innerHTML = `
       <div class="name">${s.name} ${noteHtml}</div>
-      <div class="wage">時給 ¥${s.wage.toLocaleString()} ／ 交通費 ¥${TRANSPORT}/回</div>
+      <div class="wage">${wageHtml}</div>
       <div class="calendar-mini" id="cal-${s.id}"></div>
     `;
     grid.appendChild(card);
@@ -528,6 +594,15 @@ function buildWishCalendars() {
       cal.appendChild(el);
     }
   });
+}
+
+function updateYanagawaWage(val) {
+  const w = parseInt(val);
+  if (w >= 900 && w <= 3000) {
+    STAFF.find(s => s.id === 'yanagawa').wage = w;
+    updateBudget();
+    if (Object.keys(shiftData).length > 0) renderShiftTable();
+  }
 }
 
 function toggleWish(staffId, day, el) {
@@ -640,8 +715,10 @@ function renderShiftTable() {
   for (let day = 1; day <= APRIL_2025.days; day++) {
     const dow = getDow(day);
     const th = document.createElement('th');
-    th.innerHTML = `<div>${day}</div><div style="font-size:0.65rem;opacity:0.8">${DOW_NAMES[dow]}</div>`;
+    const isHol = HOLIDAYS_APRIL.has(day);
+    th.innerHTML = `<div>${day}</div><div style="font-size:0.65rem;opacity:0.8">${isHol ? '祝' : DOW_NAMES[dow]}</div>`;
     if (isMonday(day)) { th.style.background = '#555'; }
+    else if (isHol) { th.style.background = '#7b4fa0'; }
     else if (isSunday(day)) { th.classList.add('sun'); }
     else if (isSaturday(day)) { th.classList.add('sat'); }
     tr0.appendChild(th);
@@ -706,18 +783,24 @@ function renderShiftTable() {
 
 // ===== BUDGET =====
 function calcStaffPay(s) {
-  if (!shiftData[s.id]) return { shifts: 0, hours: 0, transport: 0, total: 0 };
+  if (!shiftData[s.id]) return { shifts: 0, hours: 0, transport: 0, wagePart: 0, total: 0 };
   let shifts = 0;
+  let wagePart = 0;
   let workDays = new Set();
   for (let day = 1; day <= APRIL_2025.days; day++) {
     const st = shiftData[s.id][day];
-    if (st === 'both') { shifts += 2; workDays.add(day); }
-    else if (st === 'lunch' || st === 'dinner') { shifts += 1; workDays.add(day); }
+    if (st === 'both' || st === 'lunch' || st === 'dinner') {
+      workDays.add(day);
+      const count = st === 'both' ? 2 : 1;
+      const rate = isPremiumDay(day) ? s.wage + WEEKEND_PREMIUM : s.wage;
+      shifts += count;
+      wagePart += rate * 4 * count;
+    }
   }
   const hours = shifts * 4;
   const transport = workDays.size * TRANSPORT;
-  const pay = hours * s.wage + transport;
-  return { shifts, hours, transport, total: pay };
+  const total = wagePart + transport;
+  return { shifts, hours, transport, wagePart, total };
 }
 
 function updateBudget() {
@@ -761,6 +844,7 @@ function renderSummary() {
       <div class="sname">${s.name} <span style="font-size:0.7rem;color:#bbb">¥${s.wage}/h</span></div>
       <div class="shours">${shifts}回 / ${hours}h</div>
       <div class="spay">${fmt(total)} <span style="font-size:0.72rem;color:#aaa">（交通費¥${transport.toLocaleString()}含む）</span></div>
+      <div style="font-size:0.7rem;color:#aaa">賃金: ${fmt(wagePart)}</div>
     `;
     grid.appendChild(card);
   });
@@ -811,10 +895,8 @@ function exportExcel() {
       else { cell = ''; }
       row.push(cell);
     });
-    const hours = shifts * 4;
-    const pay = hours * s.wage;
-    const transport = workDays * TRANSPORT;
-    row.push(shifts, hours, pay, transport, pay + transport);
+    const { hours, wagePart, transport: tp, total } = calcStaffPay(s);
+    row.push(shifts, hours, wagePart, tp, total);
     rows.push(row);
   });
 
@@ -846,7 +928,7 @@ function exportExcel() {
   const sumRows = [['スタッフ', '出勤回数', '総時間(h)', '給与', '交通費', '合計']];
   STAFF.forEach(s => {
     const { shifts, hours, transport, total } = calcStaffPay(s);
-    sumRows.push([s.name, shifts, hours, hours * s.wage, transport, total]);
+    sumRows.push([s.name, shifts, hours, wagePart, transport, total]);
   });
   sumRows.push(['京太', '固定', '-', KYOTA_SALARY, '-', KYOTA_SALARY]);
   sumRows.push(['合計', '', '', '', '', grand]);
