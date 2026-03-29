@@ -1,0 +1,543 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>神凪シフトプランナー v5.9</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background: #f5f5f5; color: #333; }
+        .container { max-width: 1400px; margin: 0 auto; padding: 20px; }
+        .header { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; padding: 30px; border-radius: 8px; margin-bottom: 30px; }
+        .header h1 { font-size: 28px; margin-bottom: 10px; }
+        .tabs { display: flex; gap: 10px; margin-bottom: 20px; background: white; border-radius: 8px; overflow: hidden; box-shadow: 0 2px 8px rgba(0,0,0,0.1); }
+        .tab-btn { flex: 1; padding: 15px; border: none; background: #f0f0f0; cursor: pointer; font-size: 14px; font-weight: 600; transition: all 0.3s; }
+        .tab-btn.active { background: #667eea; color: white; }
+        .tab-btn:hover { background: #e0e0e0; }
+        .tab-btn.active:hover { background: #667eea; }
+        .tab-content { display: none; }
+        .tab-content.active { display: block; }
+        .form-section { background: white; padding: 30px; border-radius: 8px; margin-bottom: 20px; }
+        .form-group { margin-bottom: 20px; }
+        label { display: block; font-weight: 600; margin-bottom: 8px; color: #333; }
+        input, select, textarea { width: 100%; padding: 12px; border: 1px solid #ddd; border-radius: 6px; font-size: 14px; font-family: inherit; }
+        input:focus, select:focus, textarea:focus { outline: none; border-color: #667eea; box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1); }
+        button { background: #667eea; color: white; padding: 12px 24px; border: none; border-radius: 6px; font-size: 14px; font-weight: 600; cursor: pointer; transition: all 0.3s; }
+        button:hover { background: #5568d3; }
+        .staff-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 20px; margin-top: 20px; }
+        .staff-card { background: white; padding: 20px; border-radius: 8px; box-shadow: 0 2px 8px rgba(0,0,0,0.1); }
+        .staff-card h4 { color: #667eea; margin-bottom: 12px; font-size: 18px; }
+        .staff-card p { margin-bottom: 8px; font-size: 14px; }
+        .token-display { background: #f0f0f0; padding: 8px; border-radius: 4px; font-family: monospace; font-size: 12px; word-break: break-all; color: #999; }
+        .button-group { display: flex; gap: 10px; margin-top: 12px; flex-wrap: wrap; }
+        .button-group button { flex: 1; min-width: 80px; padding: 8px 12px; font-size: 12px; }
+        .delete-btn { background: #f44336; }
+        .delete-btn:hover { background: #da190b; }
+        .copy-btn { background: #28a745; }
+        .copy-btn:hover { background: #218838; }
+        .generate-btn { background: #0066cc; }
+        .generate-btn:hover { background: #0052a3; }
+        .hopes-table { width: 100%; border-collapse: collapse; margin-top: 20px; }
+        .hopes-table th, .hopes-table td { border: 1px solid #ddd; padding: 12px; text-align: center; font-size: 12px; }
+        .hopes-table th { background: #667eea; color: white; font-weight: 600; }
+        .hopes-table tr:nth-child(even) { background: #f9f9f9; }
+        .lunch { background: #fffbea; }
+        .night { background: #e3f2fd; }
+        .full { background: #f3e5f5; }
+        .off { background: #ffebee; }
+        .empty-msg { text-align: center; color: #999; padding: 40px; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>🍜 神凪シフトプランナー v5.9</h1>
+            <p>スタッフ管理・シフト希望集計・自動配置</p>
+        </div>
+
+        <!-- タブナビゲーション -->
+        <div class="tabs">
+            <button class="tab-btn active" onclick="switchTab('staff')">📋 スタッフ管理</button>
+            <button class="tab-btn" onclick="switchTab('hopes')">📊 希望集計</button>
+            <button class="tab-btn" onclick="switchTab('guide')">📖 使い方</button>
+        </div>
+
+        <!-- タブ 1：スタッフ管理 -->
+        <div id="staff" class="tab-content active">
+            <div class="form-section">
+                <h2 style="color: #667eea; margin-bottom: 20px;">➕ スタッフを追加</h2>
+                
+                <div class="form-group">
+                    <label for="staffName">スタッフ名</label>
+                    <input type="text" id="staffName" placeholder="例：柳川">
+                </div>
+
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px;">
+                    <div class="form-group">
+                        <label for="staffLunch">昼時給（円）</label>
+                        <input type="number" id="staffLunch" placeholder="例：1100">
+                    </div>
+                    <div class="form-group">
+                        <label for="staffNight">夜時給（円）</label>
+                        <input type="number" id="staffNight" placeholder="例：1300">
+                    </div>
+                </div>
+
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px;">
+                    <div class="form-group">
+                        <label for="staffTrans">交通費（円）※オプション</label>
+                        <input type="number" id="staffTrans" placeholder="例：500" value="">
+                    </div>
+                    <div class="form-group">
+                        <label for="staffNote">備考</label>
+                        <input type="text" id="staffNote" placeholder="例：子持ち、朝は苦手">
+                    </div>
+                </div>
+
+                <button onclick="addStaff()" style="width: 100%; padding: 14px; font-size: 16px;">✅ スタッフを追加</button>
+            </div>
+
+            <div class="form-section">
+                <h2 style="color: #667eea; margin-bottom: 20px;">📋 登録済みスタッフ</h2>
+                <div id="staffContainer" class="staff-grid"></div>
+            </div>
+        </div>
+
+        <!-- タブ 2：希望集計 -->
+        <div id="hopes" class="tab-content">
+            <div class="form-section">
+                <h2 style="color: #667eea; margin-bottom: 20px;">📊 シフト希望集計</h2>
+                
+                <div class="form-group">
+                    <label for="hopesMonth">月を選択</label>
+                    <select id="hopesMonth" onchange="loadHopes()">
+                        <option value="">-- 月を選択してください --</option>
+                    </select>
+                </div>
+
+                <div id="hopesContainer"></div>
+            </div>
+        </div>
+
+        <!-- タブ 3：使い方 -->
+        <div id="guide" class="tab-content">
+            <div class="form-section">
+                <h2 style="color: #667eea; margin-bottom: 20px;">📖 使い方ガイド</h2>
+                
+                <h3 style="margin-top: 20px; margin-bottom: 10px;">Step 1：スタッフを登録</h3>
+                <p>「スタッフ管理」タブでスタッフを登録してください。自動で token が生成されます。</p>
+
+                <h3 style="margin-top: 20px; margin-bottom: 10px;">Step 2：HTML を生成</h3>
+                <p>スタッフカードの「📥 HTML生成」ボタンをクリック。スタッフ用の希望入力 HTML がダウンロードされます。</p>
+
+                <h3 style="margin-top: 20px; margin-bottom: 10px;">Step 3：スタッフに URL を配布</h3>
+                <p>Netlify にアップロードした HTML の URL を各スタッフに LINE で送信してください。</p>
+
+                <h3 style="margin-top: 20px; margin-bottom: 10px;">Step 4：希望を集計</h3>
+                <p>「希望集計」タブで月を選択すると、全スタッフの希望が一覧で表示されます。</p>
+
+                <h3 style="margin-top: 20px; margin-bottom: 10px;">Netlify へのデプロイ方法</h3>
+                <ol style="margin-left: 20px; margin-top: 10px;">
+                    <li>Netlify.com にアクセス</li>
+                    <li>ログイン（Google アカウントでもOK）</li>
+                    <li>スタッフ用 HTML ファイルをドラッグ&ドロップ</li>
+                    <li>自動で URL が発行される</li>
+                    <li>その URL をスタッフに配布</li>
+                </ol>
+
+                <div style="background: #fff3cd; border: 1px solid #ffc107; padding: 15px; border-radius: 6px; margin-top: 20px;">
+                    <strong>⚠️ 注意：</strong> ブラウザの localStorage は、同じブラウザ・同じデバイスでのみデータが保存されます。スタッフが別のデバイスやブラウザで希望を入力した場合、データは同期されません。
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let staffList = [];
+
+        // タブ切り替え
+        function switchTab(tabName) {
+            document.querySelectorAll('.tab-content').forEach(el => el.classList.remove('active'));
+            document.querySelectorAll('.tab-btn').forEach(el => el.classList.remove('active'));
+            document.getElementById(tabName).classList.add('active');
+            event.target.classList.add('active');
+        }
+
+        // ローカルストレージから読み込み
+        function loadStaff() {
+            const saved = localStorage.getItem('staffList');
+            if (saved) {
+                staffList = JSON.parse(saved);
+                renderStaff();
+            }
+        }
+
+        // トークン生成
+        function generateToken() {
+            return Math.random().toString(36).substr(2, 16);
+        }
+
+        // スタッフ追加
+        function addStaff() {
+            const name = document.getElementById('staffName').value.trim();
+            const lunch = parseInt(document.getElementById('staffLunch').value);
+            const night = parseInt(document.getElementById('staffNight').value);
+            const trans = parseInt(document.getElementById('staffTrans').value) || 0;
+            const note = document.getElementById('staffNote').value.trim();
+
+            if (!name || !lunch || !night) {
+                alert('スタッフ名と時給を入力してください');
+                return;
+            }
+
+            const staff = {
+                id: Date.now(),
+                name: name,
+                lunch: lunch,
+                night: night,
+                trans: trans,
+                note: note,
+                token: generateToken()
+            };
+
+            staffList.push(staff);
+            saveStaff();
+            
+            document.getElementById('staffName').value = '';
+            document.getElementById('staffLunch').value = '';
+            document.getElementById('staffNight').value = '';
+            document.getElementById('staffTrans').value = '';
+            document.getElementById('staffNote').value = '';
+
+            renderStaff();
+        }
+
+        // スタッフ表示
+        function renderStaff() {
+            const container = document.getElementById('staffContainer');
+            
+            if (staffList.length === 0) {
+                container.innerHTML = '<p style="grid-column: 1/-1; text-align: center; color: #999;">スタッフを追加してください</p>';
+                return;
+            }
+
+            container.innerHTML = staffList.map(staff => `
+                <div class="staff-card">
+                    <h4>${staff.name}</h4>
+                    <p><strong>昼：</strong>${staff.lunch}円 / <strong>夜：</strong>${staff.night}円</p>
+                    <p><strong>交通費：</strong>${staff.trans}円</p>
+                    ${staff.note ? `<p><strong>備考：</strong>${staff.note}</p>` : ''}
+                    <div class="token-display">🔑 ${staff.token}</div>
+                    <div class="button-group">
+                        <button class="delete-btn" onclick="deleteStaff(${staff.id})">削除</button>
+                        <button class="copy-btn" onclick="copyToken('${staff.token}')">📋 コピー</button>
+                        <button class="generate-btn" onclick="generateHTML('${staff.name}', '${staff.token}')">📥 HTML生成</button>
+                    </div>
+                </div>
+            `).join('');
+        }
+
+        // スタッフ削除
+        function deleteStaff(id) {
+            if (confirm('削除しますか？')) {
+                staffList = staffList.filter(s => s.id !== id);
+                saveStaff();
+                renderStaff();
+            }
+        }
+
+        // トークンコピー
+        function copyToken(token) {
+            navigator.clipboard.writeText(token).then(() => {
+                alert('✅ トークンをコピーしました');
+            }).catch(() => {
+                alert('コピーに失敗しました');
+            });
+        }
+
+        // HTML生成＆ダウンロード
+        function generateHTML(staffName, token) {
+            const html = `<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>シフト希望入力</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); min-height: 100vh; display: flex; align-items: center; justify-content: center; padding: 20px; }
+        .container { background: white; border-radius: 12px; box-shadow: 0 10px 40px rgba(0,0,0,0.2); padding: 40px; max-width: 600px; width: 100%; }
+        h1 { color: #667eea; margin-bottom: 10px; font-size: 24px; }
+        .staff-name { color: #666; font-size: 14px; margin-bottom: 30px; padding-bottom: 20px; border-bottom: 2px solid #f0f0f0; }
+        .form-group { margin-bottom: 25px; }
+        label { display: block; font-weight: 500; color: #333; margin-bottom: 10px; }
+        select, textarea { width: 100%; padding: 12px; border: 1px solid #ddd; border-radius: 6px; font-size: 14px; font-family: inherit; }
+        select:focus, textarea:focus { outline: none; border-color: #667eea; box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1); }
+        .calendar { display: grid; grid-template-columns: repeat(7, 1fr); gap: 8px; margin-top: 10px; }
+        .calendar-header { font-weight: bold; text-align: center; padding: 8px; background: #667eea; color: white; border-radius: 4px; font-size: 12px; }
+        .calendar-day { aspect-ratio: 1; display: flex; align-items: center; justify-content: center; border: 2px solid #ddd; border-radius: 6px; cursor: pointer; font-size: 12px; background: white; transition: all 0.2s; user-select: none; }
+        .calendar-day:hover { border-color: #667eea; background: #f0f0f8; }
+        .calendar-day.empty { background: #f5f5f5; cursor: default; border: none; }
+        .calendar-day.lunch { background: #fffbea; border-color: #ffc107; color: #ff6f00; font-weight: bold; }
+        .calendar-day.night { background: #e3f2fd; border-color: #2196f3; color: #1565c0; font-weight: bold; }
+        .calendar-day.full { background: #f3e5f5; border-color: #9c27b0; color: #6a1b9a; font-weight: bold; }
+        .calendar-day.off { background: #ffebee; border-color: #f44336; color: #c62828; font-weight: bold; }
+        .shift-legend { display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px; margin-bottom: 20px; padding: 15px; background: #f9f9f9; border-radius: 6px; }
+        .legend-item { font-size: 13px; display: flex; align-items: center; gap: 8px; }
+        .legend-color { width: 24px; height: 24px; border-radius: 4px; border: 2px solid; }
+        button { width: 100%; padding: 14px; background: #667eea; color: white; border: none; border-radius: 6px; font-size: 16px; font-weight: 500; cursor: pointer; transition: all 0.3s; margin-top: 10px; }
+        button:hover { background: #5568d3; transform: translateY(-2px); box-shadow: 0 4px 12px rgba(102, 126, 234, 0.4); }
+        .status { margin-top: 20px; padding: 15px; background: #f0f0f0; border-radius: 6px; text-align: center; color: #666; font-size: 14px; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>📅 シフト希望入力</h1>
+        <div class="staff-name">スタッフ: <strong>${staffName}</strong></div>
+        
+        <div class="form-group">
+            <label for="monthSelect">月を選択</label>
+            <select id="monthSelect" onchange="loadCalendar()">
+                <option value="">-- 月を選択してください --</option>
+            </select>
+        </div>
+        
+        <div id="calendarSection" style="display: none;">
+            <div class="shift-legend">
+                <div class="legend-item">
+                    <div class="legend-color" style="background: #fffbea; border-color: #ffc107;"></div>
+                    <span>昼 (9:30-15:00)</span>
+                </div>
+                <div class="legend-item">
+                    <div class="legend-color" style="background: #e3f2fd; border-color: #2196f3;"></div>
+                    <span>夜 (17:30-21:00)</span>
+                </div>
+                <div class="legend-item">
+                    <div class="legend-color" style="background: #f3e5f5; border-color: #9c27b0;"></div>
+                    <span>終日 (9:30-21:00)</span>
+                </div>
+                <div class="legend-item">
+                    <div class="legend-color" style="background: #ffebee; border-color: #f44336;"></div>
+                    <span>休み</span>
+                </div>
+            </div>
+            
+            <div class="calendar" id="calendar"></div>
+            
+            <div class="form-group" style="margin-top: 20px;">
+                <label for="notes">備考</label>
+                <textarea id="notes" placeholder="例：〇月は学祭がある、外せない日があります など"></textarea>
+            </div>
+            
+            <button onclick="saveHopes()">✅ 希望を送信</button>
+        </div>
+        
+        <div class="status" id="status"></div>
+    </div>
+    
+    <script>
+        const STAFF_NAME = "${staffName}";
+        const STAFF_TOKEN = "${token}";
+        let selectedDays = {};
+
+        function loadMonthOptions() {
+            const currentYear = new Date().getFullYear();
+            const select = document.getElementById("monthSelect");
+            
+            for (let month = 1; month <= 12; month++) {
+                const monthStr = String(month).padStart(2, "0");
+                const monthDisplay = currentYear + "/" + monthStr;
+                const option = document.createElement("option");
+                option.value = monthStr;
+                option.textContent = monthDisplay;
+                select.appendChild(option);
+            }
+        }
+
+        function loadCalendar() {
+            const monthSelect = document.getElementById("monthSelect").value;
+            
+            if (!monthSelect) {
+                document.getElementById("calendarSection").style.display = "none";
+                return;
+            }
+            
+            document.getElementById("calendarSection").style.display = "block";
+            
+            const currentYear = new Date().getFullYear();
+            const month = parseInt(monthSelect);
+            const firstDay = new Date(currentYear, month - 1, 1);
+            const lastDay = new Date(currentYear, month, 0).getDate();
+            const startDayOfWeek = firstDay.getDay();
+            
+            selectedDays = {};
+            
+            const calendar = document.getElementById("calendar");
+            calendar.innerHTML = "";
+            
+            const dayNames = ["日", "月", "火", "水", "木", "金", "土"];
+            
+            dayNames.forEach(day => {
+                const header = document.createElement("div");
+                header.className = "calendar-header";
+                header.textContent = day;
+                calendar.appendChild(header);
+            });
+            
+            for (let i = 0; i < startDayOfWeek; i++) {
+                const empty = document.createElement("div");
+                empty.className = "calendar-day empty";
+                calendar.appendChild(empty);
+            }
+            
+            for (let day = 1; day <= lastDay; day++) {
+                const cell = document.createElement("div");
+                cell.className = "calendar-day";
+                cell.textContent = day;
+                cell.onclick = () => toggleDay(day, cell);
+                calendar.appendChild(cell);
+            }
+        }
+
+        function toggleDay(day, cell) {
+            const state = cell.className.split(" ")[1] || "";
+            const states = ["", "lunch", "night", "full", "off"];
+            const nextState = states[(states.indexOf(state) + 1) % states.length];
+            
+            cell.className = "calendar-day " + (nextState || "");
+            selectedDays[day] = nextState || null;
+        }
+
+        function saveHopes() {
+            const month = document.getElementById("monthSelect").value;
+            const notes = document.getElementById("notes").value;
+            
+            if (!month) {
+                alert("月を選択してください");
+                return;
+            }
+            
+            const key = STAFF_TOKEN + "_" + month;
+            const data = {
+                staff: STAFF_NAME,
+                token: STAFF_TOKEN,
+                month: month,
+                days: selectedDays,
+                notes: notes,
+                savedAt: new Date().toISOString()
+            };
+            
+            localStorage.setItem(key, JSON.stringify(data));
+            
+            const status = document.getElementById("status");
+            status.innerHTML = "✅ " + month + "月の希望を保存しました！";
+            status.style.background = "#c8e6c9";
+            status.style.color = "#2e7d32";
+        }
+
+        loadMonthOptions();
+    <\/script>
+</body>
+</html>`;
+
+            const blob = new Blob([html], { type: 'text/html; charset=utf-8' });
+            const url = URL.createObjectURL(blob);
+            const link = document.createElement('a');
+            link.href = url;
+            link.download = `スタッフ希望入力_${staffName}.html`;
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+            URL.revokeObjectURL(url);
+            
+            alert(`✅ ${staffName}さん用 HTML をダウンロードしました！`);
+        }
+
+        // 希望集計タブの月ドロップダウン初期化
+        function initHopesMonth() {
+            const currentYear = new Date().getFullYear();
+            const select = document.getElementById('hopesMonth');
+            
+            for (let month = 1; month <= 12; month++) {
+                const monthStr = String(month).padStart(2, '0');
+                const monthDisplay = currentYear + '/' + monthStr;
+                const option = document.createElement('option');
+                option.value = monthStr;
+                option.textContent = monthDisplay;
+                select.appendChild(option);
+            }
+        }
+
+        // 希望を読み込む
+        function loadHopes() {
+            const month = document.getElementById('hopesMonth').value;
+            const container = document.getElementById('hopesContainer');
+
+            if (!month) {
+                container.innerHTML = '<p class="empty-msg">月を選択してください</p>';
+                return;
+            }
+
+            const allKeys = Object.keys(localStorage);
+            const hopesData = [];
+
+            for (const key of allKeys) {
+                if (key.endsWith('_' + month)) {
+                    try {
+                        const data = JSON.parse(localStorage.getItem(key));
+                        hopesData.push(data);
+                    } catch (e) {
+                        console.error('Parse error:', key, e);
+                    }
+                }
+            }
+
+            if (hopesData.length === 0) {
+                container.innerHTML = '<p class="empty-msg">この月のデータはありません</p>';
+                return;
+            }
+
+            // テーブル生成
+            const lastDay = new Date(new Date().getFullYear(), parseInt(month), 0).getDate();
+            let table = '<table class="hopes-table"><thead><tr><th>スタッフ</th>';
+            
+            for (let day = 1; day <= lastDay; day++) {
+                table += `<th>${day}</th>`;
+            }
+            
+            table += '<th>備考</th></tr></thead><tbody>';
+
+            hopesData.forEach(data => {
+                table += `<tr><td><strong>${data.staff}</strong></td>`;
+                
+                for (let day = 1; day <= lastDay; day++) {
+                    const state = data.days[day] || '';
+                    const stateDisplay = {
+                        'lunch': '昼',
+                        'night': '夜',
+                        'full': '終',
+                        'off': '休'
+                    }[state] || '-';
+                    
+                    const className = state ? state : '';
+                    table += `<td class="${className}">${stateDisplay}</td>`;
+                }
+                
+                table += `<td style="font-size: 11px;">${data.notes || '-'}</td></tr>`;
+            });
+
+            table += '</tbody></table>';
+            container.innerHTML = table;
+        }
+
+        // ローカルストレージに保存
+        function saveStaff() {
+            localStorage.setItem('staffList', JSON.stringify(staffList));
+        }
+
+        // 初期化
+        loadStaff();
+        initHopesMonth();
+    </script>
+</body>
+</html>
